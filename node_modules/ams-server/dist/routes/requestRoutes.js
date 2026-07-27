@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const requestController_1 = require("../controllers/requestController");
+const auth_1 = require("../middleware/auth");
+const types_1 = require("../types");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticateToken);
+router.get('/', requestController_1.getRequests);
+router.post('/', requestController_1.createRequest);
+router.patch('/:id/approval', (0, auth_1.requireRoles)([types_1.Role.SUPER_ADMIN, types_1.Role.ADMINISTRATOR, types_1.Role.EXTENSION_OFFICER, types_1.Role.INVENTORY_OFFICER]), requestController_1.approveRejectRequest);
+exports.default = router;

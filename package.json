@@ -1,0 +1,16 @@
+{
+  "name": "baladweyne-ams",
+  "version": "1.0.0",
+  "description": "Enterprise Agricultural Management System for Baladweyne Agricultural Cooperative",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "build:client": "npm run build --prefix client",
+    "build:server": "npm run build --prefix server"
+  }
+}

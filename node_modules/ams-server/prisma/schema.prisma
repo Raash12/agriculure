@@ -1,0 +1,299 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMINISTRATOR
+  FARMER
+  EXTENSION_OFFICER
+  INVENTORY_OFFICER
+  VIEWER
+}
+
+enum CropStatus {
+  PLANTED
+  GROWING
+  FLOWERING
+  HARVEST_READY
+  HARVESTED
+  DAMAGED
+}
+
+enum CropSeason {
+  GU_SPRING
+  DER_AUTUMN
+  XAGAAG_SUMMER
+  JILAAL_WINTER
+}
+
+enum ResourceCategory {
+  SEEDS
+  FERTILIZER
+  EQUIPMENT
+  PESTICIDES
+  TOOLS
+}
+
+enum RequestStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+enum DistributionStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum WeatherAlertType {
+  NONE
+  RAIN
+  FLOOD
+  DROUGHT
+  HEATWAVE
+  RIVER_LEVEL_RISK
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  RESOURCE_COST
+  SUBSIDY
+}
+
+model User {
+  id               String           @id @default(uuid())
+  email            String           @unique
+  passwordHash     String
+  fullName         String
+  phone            String?
+  role             Role             @default(VIEWER)
+  avatarUrl        String?
+  isVerified       Boolean          @default(false)
+  isActive         Boolean          @default(true)
+  rememberToken    String?
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  lastLoginAt      DateTime?
+  
+  // Relations
+  farmerProfile    FarmerProfile?
+  approvedRequests ResourceRequest[] @relation("ApprovedByRelation")
+  createdAuditLogs AuditLog[]        @relation("UserAuditLogs")
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  @@index([email])
+  @@index([role])
+}
+
+model FarmerProfile {
+  id             String            @id @default(uuid())
+  userId         String?           @unique
+  user           User?             @relation(fields: [userId], references: [id])
+  fullName       String
+  nationalId     String            @unique
+  phone          String
+  village        String
+  district       String            @default("Baladweyne")
+  farmSizeHectares Float
+  latitude       Float?
+  longitude      Float?
+  status         String            @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  photoUrl       String?
+
+  // Relations
+  crops          Crop[]
+  requests       ResourceRequest[]
+  distributions ResourceDistribution[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@index([nationalId])
+  @@index([village])
+}
+
+model Crop {
+  id             String            @id @default(uuid())
+  farmerId       String
+  farmer         FarmerProfile     @relation(fields: [farmerId], references: [id])
+  cropName       String            // e.g., Sesame, Maize, Sorghum, Watermelon, Tomatoes
+  category       String            // Cereal, Oilseed, Vegetable, Fruit
+  season         CropSeason        @default(GU_SPRING)
+  areaPlantedHa  Float
+  expectedYieldTon Float
+  actualYieldTon   Float?
+  status         CropStatus        @default(PLANTED)
+  plantingDate   DateTime
+  harvestDate    DateTime?
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@index([farmerId])
+  @@index([cropName])
+}
+
+model Warehouse {
+  id             String            @id @default(uuid())
+  name           String
+  location       String
+  capacity       Float
+  items          InventoryItem[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+}
+
+model Supplier {
+  id             String            @id @default(uuid())
+  companyName    String
+  contactPerson  String
+  phone          String
+  email          String?
+  items          InventoryItem[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+}
+
+model InventoryItem {
+  id             String            @id @default(uuid())
+  name           String
+  category       ResourceCategory
+  sku            String            @unique
+  barcode        String?
+  quantity       Int
+  unit           String            // kg, liters, units, bags
+  minStockAlert  Int               @default(10)
+  unitCost       Float
+  warehouseId    String?
+  warehouse      Warehouse?        @relation(fields: [warehouseId], references: [id])
+  supplierId     String?
+  supplier       Supplier?         @relation(fields: [supplierId], references: [id])
+
+  distributions  ResourceDistribution[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@index([category])
+  @@index([sku])
+}
+
+model ResourceRequest {
+  id             String            @id @default(uuid())
+  farmerId       String
+  farmer         FarmerProfile     @relation(fields: [farmerId], references: [id])
+  resourceType   ResourceCategory
+  requestedQty   Int
+  unit           String
+  urgency        String            @default("MEDIUM") // LOW, MEDIUM, HIGH, EMERGENCY
+  reason         String
+  status         RequestStatus     @default(PENDING)
+  officerComment String?
+  approvedById   String?
+  approvedBy     User?             @relation("ApprovedByRelation", fields: [approvedById], references: [id])
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@index([farmerId])
+  @@index([status])
+}
+
+model ResourceDistribution {
+  id             String            @id @default(uuid())
+  farmerId       String
+  farmer         FarmerProfile     @relation(fields: [farmerId], references: [id])
+  inventoryItemId String
+  inventoryItem  InventoryItem     @relation(fields: [inventoryItemId], references: [id])
+  quantity       Int
+  distributionDate DateTime        @default(now())
+  status         DistributionStatus @default(DELIVERED)
+  digitalSignature String?          // Base64 or digital signature token
+  receiptNumber  String            @unique
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@index([farmerId])
+  @@index([receiptNumber])
+}
+
+model WeatherAlert {
+  id             String            @id @default(uuid())
+  region         String            @default("Baladweyne, Hiran")
+  alertType      WeatherAlertType
+  severity       String            @default("WARNING") // INFO, WARNING, SEVERE, EMERGENCY
+  riverLevelMeters Float           @default(4.5)
+  rainfallMm     Float             @default(0.0)
+  temperatureC   Float             @default(32.0)
+  humidity       Float             @default(65.0)
+  message        String
+  isBroadcasted  Boolean           @default(true)
+  issuedAt       DateTime          @default(now())
+}
+
+model MarketPrice {
+  id             String            @id @default(uuid())
+  marketName     String            @default("Baladweyne Central Market")
+  cropName       String
+  pricePerKgUSD  Float
+  prevPriceUSD   Float?
+  demandLevel    String            @default("HIGH") // LOW, MEDIUM, HIGH
+  recordedDate   DateTime          @default(now())
+
+  @@index([cropName])
+}
+
+model FinancialTransaction {
+  id             String            @id @default(uuid())
+  type           TransactionType
+  category       String            // Grant, Input Sale, Machinery Repair, Staff Pay
+  amountUSD      Float
+  description    String
+  referenceNo    String            @unique
+  transactionDate DateTime         @default(now())
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model SystemSetting {
+  id             String            @id @default(uuid())
+  key            String            @unique
+  value          String
+  updatedAt      DateTime          @updatedAt
+}
+
+model AuditLog {
+  id             String            @id @default(uuid())
+  userId         String?
+  user           User?             @relation("UserAuditLogs", fields: [userId], references: [id])
+  action         String            // CREATE_FARMER, APPROVE_REQUEST, LOGIN, DELETE_CROP
+  module         String            // FARMER, REQUEST, AUTH, INVENTORY
+  ipAddress      String?
+  details        String
+  createdAt      DateTime          @default(now())
+}

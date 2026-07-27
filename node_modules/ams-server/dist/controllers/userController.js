@@ -1,0 +1,219 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getAuditLogs = exports.resetUserPassword = exports.toggleUserLock = exports.toggleUserStatus = exports.deleteUser = exports.updateUser = exports.createUser = exports.getUsers = exports.mockUserDatabase = void 0;
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const types_1 = require("../types");
+exports.mockUserDatabase = [
+    {
+        id: 'usr-001',
+        fullName: 'Dr. Abdirahman Farah',
+        username: 'abdirahman.admin',
+        email: 'admin@baladweyne-ams.so',
+        phone: '+252 61 555 0100',
+        role: types_1.Role.SUPER_ADMIN,
+        status: 'ACTIVE',
+        isLocked: false,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        lastLogin: '2026-07-27 19:40',
+        createdAt: '2026-01-01',
+        passwordHash: bcryptjs_1.default.hashSync('Admin@2026', 10),
+        permissions: ['ALL_SYSTEM_ACCESS', 'USER_MANAGEMENT', 'SYSTEM_BACKUP', 'AUDIT_LOGS']
+    },
+    {
+        id: 'usr-002',
+        fullName: 'Amina Jama Warsame',
+        username: 'amina.officer',
+        email: 'officer@baladweyne-ams.so',
+        phone: '+252 61 555 0300',
+        role: types_1.Role.EXTENSION_OFFICER,
+        status: 'ACTIVE',
+        isLocked: false,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+        lastLogin: '2026-07-27 18:15',
+        createdAt: '2026-02-10',
+        passwordHash: bcryptjs_1.default.hashSync('Officer@2026', 10),
+        permissions: ['REGISTER_FARMERS', 'MANAGE_CROPS', 'PUBLISH_WEATHER', 'PUBLISH_MARKET']
+    },
+    {
+        id: 'usr-003',
+        fullName: 'Hassan Ali Roble',
+        username: 'hassan.farmer',
+        email: 'farmer@baladweyne-ams.so',
+        phone: '+252 61 555 0200',
+        role: types_1.Role.FARMER,
+        status: 'ACTIVE',
+        isLocked: false,
+        isEmailVerified: true,
+        isPhoneVerified: false,
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        lastLogin: '2026-07-26 14:20',
+        createdAt: '2026-03-05',
+        passwordHash: bcryptjs_1.default.hashSync('Farmer@2026', 10),
+        permissions: ['VIEW_PROFILE', 'SUBMIT_CROPS', 'REQUEST_RESOURCE', 'VIEW_WEATHER']
+    },
+    {
+        id: 'usr-004',
+        fullName: 'Mohamed Osman Elmi',
+        username: 'mohamed.admin',
+        email: 'mohamed@baladweyne-ams.so',
+        phone: '+252 61 888 1234',
+        role: types_1.Role.ADMINISTRATOR,
+        status: 'ACTIVE',
+        isLocked: false,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+        lastLogin: '2026-07-25 09:30',
+        createdAt: '2026-02-01',
+        passwordHash: bcryptjs_1.default.hashSync('Admin@2026', 10),
+        permissions: ['MANAGE_FARMERS', 'MANAGE_INVENTORY', 'APPROVE_REQUESTS', 'REPORTS']
+    }
+];
+const getUsers = async (req, res) => {
+    const { search, role, status } = req.query;
+    let filtered = [...exports.mockUserDatabase];
+    if (search) {
+        const q = String(search).toLowerCase();
+        filtered = filtered.filter(u => u.fullName.toLowerCase().includes(q) ||
+            u.username.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            u.phone.includes(q));
+    }
+    if (role && role !== 'ALL') {
+        filtered = filtered.filter(u => u.role === String(role));
+    }
+    if (status && status !== 'ALL') {
+        filtered = filtered.filter(u => u.status === String(status));
+    }
+    return res.json({
+        success: true,
+        data: filtered.map(u => ({
+            id: u.id,
+            fullName: u.fullName,
+            username: u.username,
+            email: u.email,
+            phone: u.phone,
+            role: u.role,
+            status: u.status,
+            isLocked: u.isLocked,
+            isEmailVerified: u.isEmailVerified,
+            isPhoneVerified: u.isPhoneVerified,
+            avatarUrl: u.avatarUrl,
+            lastLogin: u.lastLogin,
+            createdAt: u.createdAt,
+            permissions: u.permissions
+        }))
+    });
+};
+exports.getUsers = getUsers;
+const createUser = async (req, res) => {
+    const { fullName, username, email, phone, role, password } = req.body;
+    const existing = exports.mockUserDatabase.find(u => u.email.toLowerCase() === email.toLowerCase() || u.username.toLowerCase() === username.toLowerCase());
+    if (existing) {
+        return res.status(400).json({ success: false, error: 'Email or Username already exists' });
+    }
+    const newUser = {
+        id: `usr-${Date.now()}`,
+        fullName,
+        username,
+        email,
+        phone: phone || '',
+        role: role || types_1.Role.FARMER,
+        status: 'ACTIVE',
+        isLocked: false,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        lastLogin: 'Never',
+        createdAt: new Date().toISOString().split('T')[0],
+        passwordHash: bcryptjs_1.default.hashSync(password || 'Default@2026', 10),
+        permissions: ['VIEW_PROFILE']
+    };
+    exports.mockUserDatabase.unshift(newUser);
+    return res.status(201).json({ success: true, message: 'User created successfully', data: newUser });
+};
+exports.createUser = createUser;
+const updateUser = async (req, res) => {
+    const { id } = req.params;
+    const user = exports.mockUserDatabase.find(u => u.id === id);
+    if (!user) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    Object.assign(user, req.body);
+    return res.json({ success: true, message: 'User updated successfully', data: user });
+};
+exports.updateUser = updateUser;
+const deleteUser = async (req, res) => {
+    const index = exports.mockUserDatabase.findIndex(u => u.id === req.params.id);
+    if (index === -1) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    exports.mockUserDatabase.splice(index, 1);
+    return res.json({ success: true, message: 'User deleted' });
+};
+exports.deleteUser = deleteUser;
+const toggleUserStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    const user = exports.mockUserDatabase.find(u => u.id === id);
+    if (!user) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    user.status = status;
+    return res.json({ success: true, message: `User status changed to ${status}`, data: user });
+};
+exports.toggleUserStatus = toggleUserStatus;
+const toggleUserLock = async (req, res) => {
+    const { id } = req.params;
+    const user = exports.mockUserDatabase.find(u => u.id === id);
+    if (!user) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    user.isLocked = !user.isLocked;
+    return res.json({ success: true, message: `User ${user.isLocked ? 'locked' : 'unlocked'}`, data: user });
+};
+exports.toggleUserLock = toggleUserLock;
+const resetUserPassword = async (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    const user = exports.mockUserDatabase.find(u => u.id === id);
+    if (!user) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    user.passwordHash = bcryptjs_1.default.hashSync(newPassword || 'Reset@2026', 10);
+    return res.json({ success: true, message: 'Password reset successfully' });
+};
+exports.resetUserPassword = resetUserPassword;
+const getAuditLogs = async (req, res) => {
+    return res.json({
+        success: true,
+        data: [
+            {
+                id: 'log-01',
+                action: 'CREATE_USER',
+                module: 'USER_MANAGEMENT',
+                user: 'Dr. Abdirahman Farah (SUPER_ADMIN)',
+                ipAddress: '197.220.89.12',
+                details: 'Created new Agricultural Officer account: Amina Jama Warsame',
+                timestamp: new Date(Date.now() - 3600000 * 1).toISOString()
+            },
+            {
+                id: 'log-02',
+                action: 'TOGGLE_STATUS',
+                module: 'USER_MANAGEMENT',
+                user: 'Dr. Abdirahman Farah (SUPER_ADMIN)',
+                ipAddress: '197.220.89.12',
+                details: 'Activated user account: Hassan Ali Roble',
+                timestamp: new Date(Date.now() - 3600000 * 4).toISOString()
+            }
+        ]
+    });
+};
+exports.getAuditLogs = getAuditLogs;
